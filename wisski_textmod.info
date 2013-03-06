@@ -1,0 +1,9 @@
+; $Id$
+name = Text Modelling
+description =  Defines how texts are modelled semantically and linked to other instances.
+core = 6.x
+version = 0.2
+package = "WissKI Text"
+dependencies[] = wysiwyg
+dependencies[] = wisski_pathbuilder
+

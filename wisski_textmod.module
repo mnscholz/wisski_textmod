@@ -1,0 +1,520 @@
+<?php
+// $Id$
+
+// sync direction
+define('WISSKI_TEXTMOD_DEFAULT_SYNC', 0);
+define('WISSKI_TEXTMOD_NO_SYNC', 1);
+define('WISSKI_TEXTMOD_MANUAL_SYNC', 2);
+define('WISSKI_TEXTMOD_TRIPLE_FIRST_SYNC', 4);
+define('WISSKI_TEXTMOD_NODE_FIRST_SYNC', 8);
+// sync status
+define('WISSKI_TEXTMOD_NOT_IN_SYNC', 64);
+define('WISSKI_TEXTMOD_IN_SYNC', 128);
+define('WISSKI_TEXTMOD_NEEDS_SYNC_CHECK', 256);
+// sync timing
+define('WISSKI_TEXTMOD_SYNC_ON_LOAD', 1024);
+define('WISSKI_TEXTMOD_SYNC_ON_CRON', 2048);
+
+
+
+/* ******************
+* hooks
+** ******************/
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_menu () {
+
+  $items = array();
+  /* admin settings */
+  $items['admin/settings/wisski/textmod'] = array(
+      'title' => 'Text Modeling',
+      'type' => MENU_LOCAL_TASK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wisski_textmod_admin_paths'),
+      'access arguments' => array('wisski administrate page'),
+      'file' => 'wisski_textmod.admin.inc',
+      );
+  $items['admin/settings/wisski/textmod/sync'] = array(
+      'title' => 'Synchronizsation',
+      'type' => MENU_LOCAL_TASK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wisski_textmod_admin_sync'),
+      'access arguments' => array('wisski administrate page'),
+      'file' => 'wisski_textmod.admin.inc',
+      );
+  $items['admin/settings/wisski/textmod/paths'] = array(
+      'title' => 'Paths',
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wisski_textmod_admin_paths'),
+      'access arguments' => array('wisski administrate page'),
+      'file' => 'wisski_textmod.admin.inc',
+      );
+  $items['wisski/textmod/manual_sync'] = array(
+      'title' => 'Manual Synchronizsation',
+      'type' => MENU_CALLBACK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wisski_textmod_manual_sync_list'),
+      'access arguments' => array('wisski sync text node'),
+      'file' => 'wisski_textmod.admin.inc',
+      );
+  /* edit/create text tab for nodes */
+  $items['node/%node/edit_text'] = array(
+      'title' => 'Edit Text',
+      'type' => MENU_LOCAL_TASK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wisski_textmod_edit_own_text', 1),
+      'access callback' => 'wisski_textmod_access_edit_own_text',
+      'access arguments' => array(1),
+      'file' => 'wisski_textmod.node.inc',
+      );
+  $items['node/%node/add_foreign_text'] = array(
+      'title' => 'Create and Link Text',
+      'type' => MENU_LOCAL_TASK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wisski_textmod_add_foreign_text', 1),
+      'access callback' => 'wisski_textmod_access_create_foreign_text',
+      'access arguments' => array(1),
+      'file' => 'wisski_textmod.node.inc',
+      );
+  $items['node/%node/add_foreign_text/%/%'] = array(
+      'title' => 'Create and Link Text',
+      'type' => MENU_LOCAL_TASK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wisski_textmod_add_foreign_text', 1, 3, 4),
+      'access callback' => 'wisski_textmod_access_create_foreign_text',
+      'access arguments' => array(1),
+      'file' => 'wisski_textmod.node.inc',
+      );
+  $items['node/add/individual/by_text/%'] = array (
+      'title' => 'Add individual with associated free text',
+      'title callback' => 'wisski_textmod_title_callback',
+      'title arguments' => array('by_text', 4),
+      'type' => MENU_NORMAL_ITEM,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wisski_textmod_create_instance_by_text', 4),
+      'access callback' => 'wisski_textmod_access_create_instance',
+      'access arguments' => array(4),
+      'file' => 'wisski_textmod.node.inc',
+      );
+  $items['node/%node/sync_merge'] = array(
+      'title' => 'Synchronizse',
+      'type' => MENU_LOCAL_TASK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('wisski_textmod_manual_sync_merge', 1),
+      'access callback' => 'wisski_textmod_access_sync_merge',
+      'access arguments' => array(1),
+      'file' => 'wisski_textmod.node.inc',
+      );
+  return $items;
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_perm() {
+  return array('wisski sync text node');
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_init() {
+
+  $model = variable_get('wisski_textmod_model', array());
+  if (isset($model['errors']) && !empty($model['errors'])) {
+    drupal_set_message(t('The path definitions for text contains errors. !h for details.', array('!h' => l(t('See here'), 'admin/settings/wisski/textmod/paths'))), 'error', FALSE);
+  }
+
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_cron() {
+  if (variable_get('wisski_textmod_cron_sync_limit', WISSKI_TEXTMOD_SYNC_ON_CRON) & WISSKI_TEXTMOD_SYNC_ON_CRON) {
+    include_once(dirname(__FILE__) . '/wisski_textmod.sync.inc');
+    wisski_textmod_cron_sync();
+  }
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_nodeapi(&$node, $op) {
+  
+  if ($node->type != 'individual') return;
+
+  if ($op == 'insert' || $op == 'update') {
+    
+    // ensure that the triple store also contains the new text
+    include_once(dirname(__FILE__) . '/wisski_textmod.sync.inc');
+    wisski_textmod_sync_node($node, WISSKI_TEXTMOD_NODE_FIRST_SYNC);
+
+  } elseif ($op == 'load' && variable_get('wisski_textmod_sync_trigger', WISSKI_TEXTMOD_NO_SYNC) == WISSKI_TEXTMOD_SYNC_ON_LOAD) {
+    
+    // ensure that the triple store also contains the new text
+    include_once(dirname(__FILE__) . '/wisski_textmod.sync.inc');
+    wisski_textmod_sync_node($node);
+
+  }
+
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_block($op = 'list', $delta = 0, $edit = array()) {
+
+  switch ($op) {
+    case 'list':
+      
+
+      return array(
+        1 => array(
+          'info' => t('WissKI Own Texts'),
+        ),
+        2 => array(
+          'info' => t('WissKI Associated Texts'),
+        ),
+      );
+
+    case 'configure':
+    case 'save':
+      
+      // nothing to configure
+      return;
+
+    case 'view':
+      
+      if ($delta == 0) {
+        drupal_set_message('Depricated block: WissKI All Texts, caller ', 'warn');
+        if (module_exists('devel')) dpm(debug_backtrace());
+        return FALSE;
+      }
+      global $base_root, $base_path;
+
+      if(is_numeric(arg(1)))
+        $node = node_load(arg(1));
+      if(!isset($node) || $node->type != 'individual')
+        return;
+      
+      $uri = wisski_store_getObj()->wisski_ARCAdapter_delNamespace($node->title);
+
+      // delta == 0 gets own texts, delta == 1 gets foreign texts
+      list($ok, $texts) = wisski_textmod_get_texts($uri, $delta != 2, $delta != 1);
+      
+      if (!$ok) {
+        foreach ($texts as $error)
+          drupal_set_message($error, 'error');
+      }
+      
+      $content = array();
+      $c = 0;
+
+      foreach ($texts as $text_info) {
+      
+        // we can go to the text instance only if it's a foreign text
+        $ops = array();
+        if ($delta != 1) {
+          $ops[] = array(t('Goto'), url($text_info['text_instance']));
+        }
+        
+        $text = $text_info['text']; 
+        $inst_title = $text_info['text_instance'];
+        dpm($text_info);
+        $text_nid = wisski_store_get_nid_for_instance($text_info['text_instance']);
+        dpm($text_nid);
+        $text_node_url = "node/$text_nid";
+        $text_node = node_load($text_nid);
+        $format = $text_node->format;
+        if ($delta != 1) {
+          $inst_title = wisski_pathbuilder_generateGroupName($text_info['text_instance'], wisski_pathbuilder_getGroupIDForIndividual($text_info['text_instance']));
+        }
+        $ops[] = array(t('Edit'), url("$text_node_url/edit_text", array('absolute' => TRUE, 'query' => 'destination=node/' . $node->nid)));
+        
+        // format text according to filter format of text instance
+        // or a defined default format for the path
+        // we have to check for types as 0 is the system wide default format (see FILTER_FORMAT_DEFAULT)
+        $format = wisski_textmod_get_format_by_path($text_info['pid'], $format);
+        if ($format !== NULL) $text = check_markup($text_info['text'], $format);
+        else $text = check_plain($text);
+
+        // make a field for each text
+        $field = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="wisski_textmod_' . ($delta ? 'foreign' : 'own') . '_text_fr"><div class="wisski_textmod_' . ($delta ? 'foreign' : 'own') . '_text">',
+          '#value' => $text,
+          '#suffix' => '</div><div class="wisski_textmod_text_ops"><p>' . implode(' ', array_map(function($v){ return l('[' . $v[0] . ']', $v[1]); }, $ops)) . '</p></div></div>',
+        );
+        // if we collect foreign texts, surround each by a collapsible fieldset
+        if ($delta != 1) {
+          $name = wisski_pathbuilder_getName($text_info['pid']);
+          $content["fieldset_$c"] = array(
+            '#type' => 'fieldset',
+            '#title' => (empty($name) ? '' : $name . ': ') . $inst_title,
+            '#collapsible' => TRUE,
+            '#weight' => $path['weight'],
+            "text$c" => $field,
+          );
+        } else {
+          $content["text$c"] = $field;
+        }
+
+        $c++;
+
+      }
+
+      $ret = array(
+        'subject' => t('Associated texts'),
+        'content' => drupal_render($content),
+      );
+      return $ret;
+
+  }
+
+}
+
+
+/* ***************************
+* getters and setters
+** ***************************/
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_get_model() {
+
+  $model = variable_get('wisski_textmod_model', array());
+  if (empty($model)) {
+    include_once(dirname(__FILE__) . '/wisski_textmod.paths.inc');
+    $model = _wisski_textmod_build_text_model_from_pb();
+    variable_set('wisski_textmod_model', $model);
+  }
+  return $model;
+
+}
+
+
+/** Get the text and information associated with instance $inst.
+*
+* @return a list of all texts associated with $inst
+*
+* @author Martin Scholz
+*/
+function wisski_textmod_get_texts($inst, $include_own = TRUE, $include_foreign = TRUE) {
+  
+  include_once(dirname(__FILE__) . '/wisski_textmod.paths.inc');
+  $texts = array();
+  if ($include_own) {
+    list($ok, $arr) = wisski_textmod_get_own_texts($inst);
+    if ($ok === FALSE) return array(FALSE, $arr);
+    else $texts = $arr;
+  }
+  if ($include_foreign) {
+    list($ok, $arr) = wisski_textmod_get_foreign_texts($inst);
+    if ($ok === FALSE) return array(FALSE, $arr);
+    else $texts = array_merge($texts, $arr);
+  }
+  
+  if (variable_get('wisski_textmod_sync_triggers', WISSKI_TEXTMOD_NO_SYNC) & WISSKI_TEXTMOD_SYNC_ON_LOAD) {
+    include_once(dirname(__FILE__) . '/wisski_textmod.sync.inc');
+    
+    foreach ($texts as $k => $text) {
+      list($stat, $new_text) = wisski_textmod_sync_instance($text['text_instance']);
+      if ($stat === FALSE) {
+        return array(FALSE, $new_text);
+      } else {
+        $text[$k]['text'] = $new_text;
+      }
+    }
+  }
+  
+  return array(TRUE, $texts);
+
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_set_foreign_text($text, $inst, $text_inst = '', $pid = NULL, $inst_x = 0) {
+  
+  list($ok, $text_inst) = wisski_textmod_set_own_text($text, $text_inst, $pid);
+  if ($ok === FALSE) return array(FALSE, t('Could not set text for text instance.'));
+  
+  include_once(dirname(__FILE__) . '/wisski_textmod.paths.inc');
+
+  if (!empty($inst)) {
+    // first check if there is already a 
+    list($ok, $arr) = wisski_textmod_get_foreign_texts($inst, array($pid), $inst_x);
+    if (!$ok) return array(FALSE, $arr);
+
+    foreach ($arr as $t) {
+      if ($t['text_instance'] == $text_inst) return array(TRUE, $inst, $text_inst);
+    }
+  }
+
+  $inst = _wisski_textmod_link_to_foreign_text($inst, $text_inst, $pid, $inst_x);
+  
+  if ($inst !== FALSE) return array(TRUE, $inst, $text_inst);
+  else return array(FALSE, array(t('Could not link to text instance.')));
+
+}
+
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_set_own_text($text, $text_inst = '', $pid = NULL) {
+
+  if ($text === NULL && $text_inst == NULL) {
+    return array(FALSE, t('You must specify either a text or a text instance.'));
+  }
+
+  if ($pid == NULL && $inst == NULL) {
+    return array(FALSE, t('You must specify either a path ID or an instance'));
+  }
+
+  include_once(dirname(__FILE__) . '/wisski_textmod.paths.inc');
+  include_once(dirname(__FILE__) . '/wisski_textmod.sync.inc');
+  
+  if (!empty($text_inst)) {
+    _wisski_textmod_delete_own_text($text_inst, $text, $pid);
+  }
+  
+  if ($text !== NULL) {
+    $text_inst = _wisski_textmod_set_own_text($text_inst, $text, $pid);
+    if ($text_inst === FALSE) return array(FALSE, t('Could not store text.'));
+  }
+  
+  wisski_textmod_sync_instance($text_inst, WISSKI_TEXTMOD_TRIPLE_FIRST_SYNC);
+  
+  return array(TRUE, $text_inst);
+  
+}
+
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_get_format_by_class($text_class) {
+  return 0;
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_get_format_by_path($pid, $default = NULL) {
+  if ($default !== NULL) return $default;
+  return 0;
+}
+
+
+
+/* ***************************
+* access functions
+** ***************************/
+
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_access_create_instance($gid) {
+  
+  if (!user_access('wisski access templateCreate')) return FALSE;
+  $model = wisski_textmod_get_model();
+
+  if (isset($model['groups'][$gid]) && (!empty($model['groups'][$gid]['text_class']) || !empty($model['groups'][$gid]['foreign_paths']))) return TRUE;
+
+  return FALSE;
+
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_access_create_foreign_text($node, $gid = NULL) {
+
+  if (!user_access('wisski access templateCreate')) return FALSE;
+  if (!user_access('wisski access templateEdit')) return FALSE;
+
+  if ($node->type != 'individual') return FALSE;
+  
+  module_load_include('inc', 'wisski_pathbuilder');
+
+  if (empty($gid)) $gid = wisski_pathbuilder_getGroupIDForIndividual(wisski_store_getObj()->wisski_ARCAdapter_delNamespace($node->title));
+  if ($gid == -1) return FALSE;
+
+  $model = wisski_textmod_get_model();
+
+  if (isset($model['groups'][$gid]) && !empty($model['groups'][$gid]['foreign_paths'])) return TRUE;
+
+  return FALSE;
+
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_access_edit_own_text($node) {
+
+  if (!user_access('wisski access templateEdit')) return FALSE;
+  
+  if ($node->type != 'individual') return FALSE;
+  
+  module_load_include('inc', 'wisski_pathbuilder');
+
+  $gid = wisski_pathbuilder_getGroupIDForIndividual(wisski_store_getObj()->wisski_ARCAdapter_delNamespace($node->title));
+  dpm($gid);
+  if ($gid == -1) return FALSE;
+
+  $model = wisski_textmod_get_model();
+
+  if (isset($model['groups'][$gid]) && $model['groups'][$gid]['text_class'] != NULL) return TRUE;
+
+  return FALSE;
+
+}
+
+
+function wisski_textmod_access_sync_merge($node) {
+  
+  if (!user_access('wisski sync text node')) {
+    return FALSE;
+  }
+
+  $res = db_query('SELECT status FROM {wisski_textmod_sync} WHERE `nid` = %d', $node->nid);
+  
+  if ($row = db_fetch_array($res)) {
+    return $row['status'] == WISSKI_TEXTMOD_NOT_IN_SYNC;
+  }
+  return FALSE;
+
+}
+
+
+
+function wisski_textmod_title_callback($type, $arg) {
+  switch ($type) {
+    case 'by_text':
+      module_load_include('inc', 'wisski_pathbuilder');
+      return t('Add @g with associated free text', array('@g' => wisski_pathbuilder_getName($arg)));
+  }
+  return '';
+}

@@ -1,0 +1,65 @@
+<?php
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_install() {
+  
+  drupal_install_schema('wisski_textmod');
+  
+  variable_del('wisski_textmod_sync_policy', 2);
+  variable_del('wisski_textmod_sync_trigger', 3072);
+
+}
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_uninstall() {
+  drupal_uninstall_schema('wisski_textmod');
+
+  variable_del('wisski_textmod_model');
+  variable_del('wisski_textmod_sync_policy');
+  variable_del('wisski_textmod_sync_trigger');
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_schema() {
+  $schema['wisski_textmod_sync'] = array(
+    'fields' => array(
+      'nid' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'not null' => TRUE,
+      ),
+      'instance' => array(
+        'type' => 'text',
+        'size' => 'normal',
+        'not null' => TRUE,
+      ),
+      'status' => array(
+        'type' => 'int',
+        'size' => 'normal',
+        'not null' => TRUE,
+      ),
+      'timestamp' => array(
+        'type' => 'varchar',
+        'length' => 20,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('nid'),
+    'indexes' => array(
+      'instance' => array(array('instance', 100)),
+      'timestamp' => array('timestamp'),
+      'status' => array('status'),
+    ),
+  );
+
+  return $schema;
+
+}
