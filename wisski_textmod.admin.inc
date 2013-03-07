@@ -147,6 +147,9 @@ function wisski_textmod_admin_paths($form_state) {
 
 
 
+/**
+* @author Martin Scholz
+*/
 function wisski_textmod_admin_sync($form_state) {
 
   $form = array();
@@ -154,7 +157,7 @@ function wisski_textmod_admin_sync($form_state) {
     '#type' => 'radios',
     '#title' => t('Synchronizsation policy'),
     '#options' => array(
-      's' . WISSKI_TEXTMOD_NO_SYNC => t('No synchronizsation. Use with caution!'),
+      's' . WISSKI_TEXTMOD_NO_SYNC => t('No synchronizsation. Do not use this unless you know what you do!'),
       's' . WISSKI_TEXTMOD_MANUAL_SYNC => t('Manual synchronizsation. You will be warned if texts are not in sync.'),
       's' . WISSKI_TEXTMOD_TRIPLE_FIRST_SYNC => t('Always take version from triple store.'),
       's' . WISSKI_TEXTMOD_NODE_FIRST_SYNC => t('Always take version from node body.'),
@@ -178,9 +181,35 @@ function wisski_textmod_admin_sync($form_state) {
     '#default_value' => $triggers,
   );
 
+  $form['cron_sync_fs'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Cron synchronizsation options'),
+    '#description' => t('These options are considered only if cron synchronizsation is enabled'),
+  );
+  $form['cron_sync_fs']['cron_sync_limit'] = array(
+    '#type' => 'select',
+    '#title' => t('Limit'),
+    '#description' => t('Maximum number of sync checks per cron run.'),
+    '#options' => array(10 => "10", 50 => "50", 100 => "100", 200 => "200", 500 => "500", 1000 => "1000"),
+    '#default_value' => variable_get('wisski_textmod_cron_sync_limit', 500),
+  );
+  $form['cron_sync_fs']['cron_sync_expire'] = array(
+    '#type' => 'select',
+    '#title' => t('Expiration'),
+    '#options' => array(0 => t('Never'), 60 => t('1 minute'), 3600 => t('1 hour'), 86400 => t('1 day'), 604800 => t('1 week'), 18144000 => t('1 month')),
+    '#default_value' => variable_get('wisski_textmod_cron_sync_expire', 604800),
+    '#description' => t('Amount of time after which an instance will be queued for sync again'),
+  );
+  $form['cron_sync_fs']['cron_sync_clear_table'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Reset sync table'),
+    '#default_value' => 0,
+    '#description' => t('When checked, this will clear all sync information from the system. The information is eventually rebuild with each subsequent cron run. Only check this if you know what you are doing!'),
+  );
+
   $form['submit'] = array(
     '#type' => 'submit',
-    '#value' => t('Submit'), 
+    '#value' => t('Save configuration'), 
   );
 
   return $form;
@@ -188,12 +217,22 @@ function wisski_textmod_admin_sync($form_state) {
 }
 
 
+
+/**
+* @author Martin Scholz
+*/
 function wisski_textmod_admin_sync_submit($form, $form_state) {
   
   variable_set('wisski_textmod_sync_policy', substr($form_state['values']['sync_policy'], 1));
+  variable_set('wisski_textmod_cron_sync_limit', $form_state['values']['cron_sync_limit']);
+  variable_set('wisski_textmod_cron_sync_expire', $form_state['values']['cron_sync_expire']);
   $triggers = 0;
   foreach ($form_state['values']['sync_triggers'] as $t) $triggers |= substr($t, 1);
   variable_set('wisski_textmod_sync_triggers', $triggers);
+
+  if ($form_state['values']['cron_sync_clear_table']) {
+    db_query('TRUNCATE TABLE {wisski_textmod_sync}');
+  }
 
 }
 

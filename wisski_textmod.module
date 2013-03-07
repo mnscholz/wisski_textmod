@@ -11,6 +11,7 @@ define('WISSKI_TEXTMOD_NODE_FIRST_SYNC', 8);
 define('WISSKI_TEXTMOD_NOT_IN_SYNC', 64);
 define('WISSKI_TEXTMOD_IN_SYNC', 128);
 define('WISSKI_TEXTMOD_NEEDS_SYNC_CHECK', 256);
+define('WISSKI_TEXTMOD_NO_TEXT_INSTANCE', 512);
 // sync timing
 define('WISSKI_TEXTMOD_SYNC_ON_LOAD', 1024);
 define('WISSKI_TEXTMOD_SYNC_ON_CRON', 2048);
@@ -138,7 +139,7 @@ function wisski_textmod_init() {
 * @author Martin Scholz
 */
 function wisski_textmod_cron() {
-  if (variable_get('wisski_textmod_cron_sync_limit', WISSKI_TEXTMOD_SYNC_ON_CRON) & WISSKI_TEXTMOD_SYNC_ON_CRON) {
+  if (variable_get('wisski_textmod_sync_trigger', WISSKI_TEXTMOD_SYNC_ON_CRON) & WISSKI_TEXTMOD_SYNC_ON_CRON) {
     include_once(dirname(__FILE__) . '/wisski_textmod.sync.inc');
     wisski_textmod_cron_sync();
   }
@@ -230,9 +231,7 @@ function wisski_textmod_block($op = 'list', $delta = 0, $edit = array()) {
         
         $text = $text_info['text']; 
         $inst_title = $text_info['text_instance'];
-        dpm($text_info);
         $text_nid = wisski_store_get_nid_for_instance($text_info['text_instance']);
-        dpm($text_nid);
         $text_node_url = "node/$text_nid";
         $text_node = node_load($text_nid);
         $format = $text_node->format;
@@ -481,7 +480,6 @@ function wisski_textmod_access_edit_own_text($node) {
   module_load_include('inc', 'wisski_pathbuilder');
 
   $gid = wisski_pathbuilder_getGroupIDForIndividual(wisski_store_getObj()->wisski_ARCAdapter_delNamespace($node->title));
-  dpm($gid);
   if ($gid == -1) return FALSE;
 
   $model = wisski_textmod_get_model();
@@ -493,6 +491,9 @@ function wisski_textmod_access_edit_own_text($node) {
 }
 
 
+/**
+* @author Martin Scholz
+*/
 function wisski_textmod_access_sync_merge($node) {
   
   if (!user_access('wisski sync text node')) {
@@ -510,6 +511,9 @@ function wisski_textmod_access_sync_merge($node) {
 
 
 
+/**
+* @author Martin Scholz
+*/
 function wisski_textmod_title_callback($type, $arg) {
   switch ($type) {
     case 'by_text':

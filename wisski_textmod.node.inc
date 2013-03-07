@@ -343,10 +343,18 @@ function wisski_textmod_manual_sync_merge($form_state, $node) {
 }
 
 
+/**
+* @author Martin Scholz
+*/
 function wisski_textmod_manual_sync_merge_validate($form, $form_state) {
   if (empty($form_state['values']['merge'])) form_set_error('merge', t('Please choose a text version.'));
 } 
 
+
+
+/**
+* @author Martin Scholz
+*/
 function wisski_textmod_manual_sync_merge_submit($form, &$form_state) {
   
   $node = node_load($form_state['values']['nid']);

@@ -8,8 +8,8 @@ function wisski_textmod_install() {
   
   drupal_install_schema('wisski_textmod');
   
-  variable_del('wisski_textmod_sync_policy', 2);
-  variable_del('wisski_textmod_sync_trigger', 3072);
+  variable_set('wisski_textmod_sync_policy', 2);
+  variable_set('wisski_textmod_sync_trigger', 3072);
 
 }
 
@@ -22,6 +22,9 @@ function wisski_textmod_uninstall() {
   variable_del('wisski_textmod_model');
   variable_del('wisski_textmod_sync_policy');
   variable_del('wisski_textmod_sync_trigger');
+  variable_del('wisski_textmod_cron_sync_limit');
+  variable_del('wisski_textmod_cron_sync_expire');
+
 }
 
 
@@ -47,8 +50,8 @@ function wisski_textmod_schema() {
         'not null' => TRUE,
       ),
       'timestamp' => array(
-        'type' => 'varchar',
-        'length' => 20,
+        'type' => 'int',
+        'size' => 'big',
         'not null' => TRUE,
       ),
     ),

@@ -212,6 +212,9 @@ function _wisski_textmod_set_own_text($text_inst, $text, $pid = NULL) {
 }
 
 
+/**
+* @author Martin Scholz
+*/
 function _wisski_textmod_delete_own_text($text_inst, $text = NULL, $pid = NULL) {
   
   $model = wisski_textmod_get_model();

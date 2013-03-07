@@ -21,7 +21,7 @@ function _wisski_textmod_sync($inst, $node, $sync_policy) {
   if (count($texts) > 1) {
     // warn if there are more than one text paths and treat like manual sync
     drupal_set_message(t('Multiple texts for instance !i not supported at the moment. Please manually resolve.', array('!i' => l(check_plain($inst), $inst))), 'error');
-    _wisski_textmod_queue_for_sync($inst, $node->nid);
+    _wisski_textmod_set_sync_state($inst, $node->nid, WISSKI_TEXTMOD_NOT_IN_SYNC);
   }
 
   if (empty($texts)) {
@@ -35,7 +35,7 @@ function _wisski_textmod_sync($inst, $node, $sync_policy) {
   
   // the easy case: if both texts are equal, we need not do anything
   if ($text == $node->body) {
-    _wisski_textmod_unqueue_for_sync($node->nid);
+    _wisski_textmod_set_sync_state($inst, $node->nid, WISSKI_TEXTMOD_IN_SYNC);
     return array(WISSKI_TEXTMOD_IN_SYNC, $text, $text);
   }
   
@@ -52,7 +52,7 @@ function _wisski_textmod_sync($inst, $node, $sync_policy) {
       node_save($node);
       node_load($arg1, NULL, TRUE); // if we don't reload with cache reset, subsequent calls to node_load will return the unchanged node!
 
-      _wisski_textmod_unqueue_for_sync($node->nid);
+      _wisski_textmod_set_sync_state($inst, $node->nid, WISSKI_TEXTMOD_IN_SYNC);
       return array(WISSKI_TEXTMOD_IN_SYNC, $text, $text);
     
     // the text version in the node body will be taken 
@@ -63,6 +63,7 @@ function _wisski_textmod_sync($inst, $node, $sync_policy) {
         $tmp = _wisski_textmod_delete_own_text($inst, $text, $pid);
         if (!$tmp) {
           drupal_set_message(t('Could not sync: Could not delete old text from triple store.'), 'error');
+          _wisski_textmod_set_sync_state($inst, $node->nid, WISSKI_TEXTMOD_NOT_IN_SYNC);
           return array(WISSKI_TEXTMOD_NOT_IN_SYNC, $text, $node->body); 
         }
       }
@@ -70,19 +71,21 @@ function _wisski_textmod_sync($inst, $node, $sync_policy) {
         $tmp = _wisski_textmod_set_own_text($inst, $node->body, $pid);
         if (!$tmp) {
           drupal_set_message(t('Could not sync: Could not write new text to triple store.'), 'error');
+          _wisski_textmod_set_sync_state($inst, $node->nid, WISSKI_TEXTMOD_NOT_IN_SYNC);
           return array(WISSKI_TEXTMOD_NOT_IN_SYNC, $text, $node->body); 
         }
       }
       drupal_set_message(t('The triple store got synced with the text node content.')); 
 
-      _wisski_textmod_unqueue_for_sync($node->nid);
+      _wisski_textmod_set_sync_state($inst, $node->nid, WISSKI_TEXTMOD_IN_SYNC);
       return array(WISSKI_TEXTMOD_IN_SYNC, $nody->body, $nody->body);
 
     // do not favour a sync direction, but let the user do the merge
     // we issue a warning, though
     case WISSKI_TEXTMOD_MANUAL_SYNC:
       
-      _wisski_textmod_queue_for_sync($inst, $node->nid);
+      _wisski_textmod_set_sync_state($inst, $node->nid, WISSKI_TEXTMOD_NOT_IN_SYNC);
+      wisski_textmod_set_sync_message($inst, $node->nid);
       return array(WISSKI_TEXTMOD_NOT_IN_SYNC, $text, $node->body);
     
     // we do nothing, we even don't warn! This can easily lead to inconsistencies but may be faster
@@ -125,70 +128,75 @@ function wisski_textmod_sync_node($node, $sync_policy = WISSKI_TEXTMOD_DEFAULT_S
 
 
 
-function _wisski_textmod_queue_for_sync($inst, $nid) {
+/**
+* @author Martin Scholz
+*/
+function _wisski_textmod_set_sync_state($inst, $nid, $state) {
   
   $res = db_query('SELECT status FROM {wisski_textmod_sync} WHERE `nid` = %d', $nid);
   $res = db_fetch_array($res);
   if (!$res) {
     // insert
-    db_query("INSERT INTO {wisski_textmod_sync} (`nid`, `instance`, `status`, `timestamp`) VALUES (%d, '%s', %d, '%s')", $nid, $inst, WISSKI_TEXTMOD_NOT_IN_SYNC, time());
-  } elseif ($res['status'] != WISSKI_TEXTMOD_NOT_IN_SYNC) {
-    // update
-    db_query("UPDATE {wisski_textmod_sync} SET `status` = %d, `timestamp` = '%s' WHERE `nid` = %d", WISSKI_TEXTMOD_NOT_IN_SYNC, time(), $nid);
-  } // do nothing if status is already not in sync
+    db_query("INSERT INTO {wisski_textmod_sync} (`nid`, `instance`, `status`, `timestamp`) VALUES (%d, '%s', %d, %d)", $nid, $inst, $state, time());
+  } else {
+    // update; we even update if state is already set to set anew the timestamp
+    db_query("UPDATE {wisski_textmod_sync} SET `status` = %d, `timestamp` = %d WHERE `nid` = %d", $state, time(), $nid);
+  } 
+
+}
+
+
+/**
+* @author Martin Scholz
+*/
+function wisski_textmod_set_sync_message($inst, $nid) {
   drupal_set_message(t('Text instance !n is not in sync. !resolve', array('!n' => l(check_plain($inst), $inst), '!resolve' => l(t('Please manually resolve.'), "node/$nid/sync_merge"))), 'warn', FALSE);
-
-}
-
-function _wisski_textmod_unqueue_for_sync($nid) {
-  
-  db_query("DELETE FROM {wisski_textmod_sync} WHERE `nid` = %d", $nid);
-
 }
 
 
 
+/**
+* @author Martin Scholz
+*/
 function wisski_textmod_cron_sync() {
   
   module_load_include('inc', 'wisski_pathbuilder');
+
   $model = wisski_textmod_get_model();
   $limit = variable_get('wisski_textmod_cron_sync_limit', 500);
+  $expire = variable_get('wisski_textmod_cron_sync_expire', 604800);
+  $expire = time() - $expire;
+  
+  // mark expired instances for recheck
+  db_query("UPDATE {wisski_textmod_sync} SET `status` = %d, `timestamp` = %d WHERE `status` != %d AND `status` != %d AND `timestamp` < %d", WISSKI_TEXTMOD_NEEDS_SYNC_CHECK, WISSKI_TEXTMOD_NO_TEXT_INSTANCE, time(), WISSKI_TEXTMOD_NEEDS_SYNC_CHECK, $exprire);
 
   // populate the agenda
   // we always load twice as many nodes as we process,
   // so that the agenda will eventually be filled with all nodes
-  $res = db_query_range("SELECT n.nid, n.title FROM {node} AS n WHERE `n`.`type` = 'individual' AND `n`.`nid` NOT IN (SELECT `s`.`nid` FROM {wisski_textmod_sync} AS s WHERE 1)", 0, 2 * $limit);
-  $values = array();
-  while ($row = db_fetch_array($res)) {
-    $values[] = $row['nid'];
-    $values[] = wisski_store_getObj()->wisski_ARCAdapter_delNamespace($row['title']);
-    $values[] = WISSKI_TEXTMOD_NEEDS_SYNC_CHECK;
-    $values[] = time();
+  db_query("INSERT INTO {wisski_textmod_sync} (`nid`, `instance`, `status`, `timestamp`) SELECT `n`.`nid` , '', %d, %d FROM {node} AS n WHERE `n`.`type` = 'individual' AND `n`.`nid` NOT IN (SELECT `s`.`nid` FROM {wisski_textmod_sync} AS s WHERE 1)", WISSKI_TEXTMOD_NEEDS_SYNC_CHECK, time());
 
-    if (count($values) % 400 == 0) {
-      db_query('INSERT INTO {wisski_textmod_sync} (`nid`, `instance`, `status`, `timestamp`) VALUES ' . join(', ', array_fill(0, count($values) / 4, "(%d, '%s', %d, '%s')")), $values);
-      $values = array();
-    }
-  }
-  if (!empty($values)) {
-    db_query('INSERT INTO {wisski_textmod_sync} (`nid`, `instance`, `status`, `timestamp`) VALUES ' . join(', ', array_fill(0, count($values) / 4, "(%d, '%s', %d, '%s')")), $values);
-  }
-
-  $res = db_query_range('SELECT nid, instance FROM {wisski_textmod_sync} WHERE `status` = %d ORDER BY `timestamp`', WISSKI_TEXTMOD_NEEDS_SYNC_CHECK, 0, $limit);
-  
+  // query $limit number of nodes and check them for sync
+  // note that we check all instance nodes, regardless of whether they are text instances
+  $res = db_query_range('SELECT nid FROM {wisski_textmod_sync} WHERE `status` = %d ORDER BY `timestamp` ASC', WISSKI_TEXTMOD_NEEDS_SYNC_CHECK, 0, $limit);
   while ($row = db_fetch_array($res)) {
 
     $nid = $row['nid'];
-    _wisski_textmod_unqueue_for_sync($nid);
     $node = node_load($nid, NULL, TRUE);
     if ($node) { // node may be deleted, so check
       // check if instance is a text instance
-      $inst = $row['instance'];
+      $inst = wisski_store_getObj()->wisski_ARCAdapter_delNamespace($node->title);
       $gid = wisski_pathbuilder_getGroupIDForIndividual($inst);
-      if (!isset($model['groups'][$gid]) || empty($model['groups'][$gid]['text_class'])) continue;
-
-      _wisski_textmod_sync($inst, $node, WISSKI_TEXTMOD_DEFAULT_SYNC);
-    }
+      if (!isset($model['groups'][$gid]) || empty($model['groups'][$gid]['text_class'])) {
+        // we mark this instance, so that next cron runs it won't be checked again
+        // will be checked again only if table gets cleared
+        _wisski_textmod_set_sync_state($inst, $nid, WISSKI_TEXTMOD_NO_TEXT_INSTANCE);
+      } else {
+        // this is a text instance and must be checks for sync
+        _wisski_textmod_sync($inst, $node, WISSKI_TEXTMOD_DEFAULT_SYNC);
+      }
+    } else {  // node was deleted
+      db_query('DELETE FROM {wisski_textmod_sync} WHERE `nid` = %d', $nid);
+    } 
   }
 }
 
