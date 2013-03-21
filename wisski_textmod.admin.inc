@@ -35,7 +35,11 @@ function wisski_textmod_admin_paths($form_state) {
     '#tree' => TRUE,
   );
   
-  $form['automodel'] = array(
+  $form['path_model'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Path definitions'),
+    );
+  $form['path_model']['automodel'] = array(
     '#type' => 'checkbox',
     '#default_value' => TRUE,
     '#disabled' => TRUE,
@@ -44,7 +48,7 @@ function wisski_textmod_admin_paths($form_state) {
   );
 
   if ($model['errors']) {
-    $form['errors'] = array(
+    $form['path_model']['errors'] = array(
       '#type' => 'markup',
       '#prefix' => '<p>',
       '#suffix' => '</p>',
@@ -52,14 +56,14 @@ function wisski_textmod_admin_paths($form_state) {
     );
   }
   if ($model['warnings']) {
-    $form['warnings'] = array(
+    $form['path_model']['warnings'] = array(
       '#type' => 'markup',
       '#prefix' => '<p>',
       '#suffix' => '</p>',
       '#value' => '<strong>' . t('There are warnings in the text model (see above). It is recommended to change your path definitions.') . '</strong>',
     );
   }
-  $form['text_groups'] = array(
+  $form['path_model']['text_groups'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Text groups'),
     '#disabled' => TRUE,
@@ -67,12 +71,12 @@ function wisski_textmod_admin_paths($form_state) {
     '#default_value' => array_keys($text_groups_opt),
   );
 
-  $form['text_paths'] = array(
+  $form['path_model']['text_paths'] = array(
     '#type' => 'fieldset',
     '#title' => t('Text paths'),
   );
   foreach ($text_groups_opt as $gid => $name) {
-    $form['text_paths']['text_group_' . $gid] = array(
+    $form['path_model']['text_paths']['text_group_' . $gid] = array(
       '#type' => 'fieldset',
       '#title' => t('Text group %n', array('%n' => $name)),
       '#collapsible' => TRUE,
@@ -83,7 +87,7 @@ function wisski_textmod_admin_paths($form_state) {
     
     foreach ($model['text_classes'][$cl_uri]['text_paths'] as $pid) {
       $info = $model['paths'][$pid];
-      $form['text_paths']['text_group_' . $gid]['group_' . $gid . '_text_' . $pid] = array(
+      $form['path_model']['text_paths']['text_group_' . $gid]['group_' . $gid . '_text_' . $pid] = array(
         '#type' => 'item',
         '#title' => t('Path'),
         '#value' => t('%n (ID: %id, Group: %g) @c', array(
@@ -106,7 +110,7 @@ function wisski_textmod_admin_paths($form_state) {
     }
     $tile_path[] = $data['datatype_property'];
 
-    $form['text_paths']['text_group_' . $gid]['group_' . $gid . '_tilepath'] = array(
+    $form['path_model']['text_paths']['text_group_' . $gid]['group_' . $gid . '_tilepath'] = array(
       '#type' => 'item',
       '#title' => t('Relevant path suffix'),
       '#value' => join(' -> ', $tile_path),
@@ -115,7 +119,7 @@ function wisski_textmod_admin_paths($form_state) {
   }
 
 
-  $form['default_text_groups'] = array(
+  $form['path_model']['default_text_groups'] = array(
     '#type' => 'fieldset',
     '#title' => t('Default text paths'),
   );
@@ -132,7 +136,7 @@ function wisski_textmod_admin_paths($form_state) {
       if ($def == '<none>') $def = "pid_$pid";
       $opts["pid_$pid"] = wisski_pathbuilder_getName($pid) . ' -- ' . wisski_pathbuilder_getName(end($model['paths'][$pid]['groups']));
     }
-    $form['default_text_groups']['default_group_' . $gid] = array(
+    $form['path_model']['default_text_groups']['default_group_' . $gid] = array(
       '#type' => 'select',
       '#title' => t('Default text path for %n', array('%n' => wisski_pathbuilder_getName($gid))),
       '#options' => $opts,
@@ -141,7 +145,81 @@ function wisski_textmod_admin_paths($form_state) {
     );
   }
 
+
+  $form['path_formats'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Input formats'),
+  );
+  
+  $formats = variable_get('wisski_textmod_input_formats', array());
+  $format_opts = array(
+#    t('Special formats') => array(
+      'undef' => t('Not available'),
+      'default' => t("Node's format"),
+      0 => t('System default'),
+#    ),
+  );
+#  foreach (filter_formats() as $f) $format_opts[t('Input formats')][$f->format] = $f->name;
+  foreach (filter_formats() as $f) $format_opts[$f->format] = $f->name;
+
+  foreach ($text_groups_opt + array('default' => 'Default format') as $gid => $name) {
+    $pid = $gid == 'default' ? 'default' : $model['text_classes'][$model['groups'][substr($gid, 4)]['text_class']]['canonical_path'];
+    if (isset($formats[$pid])) {
+      $first_format = $formats[$pid][0];
+      $second_format = isset($formats[$pid][1]) ? $formats[$pid][1] : 'undef';
+    } else {
+      $first_format = 'undef';
+      $second_format = 'undef';
+    }
+
+    $form['path_formats']["format_$gid"] = array(
+      '#type' => 'select',
+      '#title' => $name,
+      '#options' => $format_opts,
+      '#default_value' => $first_format,
+      '#description' => $gid == 'default' ? t('Will be used as fallback if format for a group is undefined.') : '',
+    );
+    $form['path_formats']["format_${gid}_fallback"] = array(
+      '#type' => 'select',
+      '#title' => t('Fallback for @g', array('@g' => $name)),
+      '#options' => $format_opts,
+      '#default_value' => $second_format,
+      '#description' => t('Fallback format if first format is Node format and it happens to be undefined or the system default format'),
+    );
+  }
+
+  $form['buttons']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save configuration'),
+  );
+
   return $form;
+
+}
+
+
+function wisski_textmod_admin_paths_submit($form, $form_state) {
+  $model = wisski_textmod_get_model();
+  $formats = array();
+  foreach ($form_state['values']['path_formats'] as $k => $v) {
+    if ($v == 'undef') continue;
+    if (!preg_match('/^format_(gid_(\d+)|(default))$/u', $k, $matches)) continue;
+    $gidstr = $matches[1];
+    $gid = empty($matches[2]) ? $matches[3] : $matches[2];
+    $queue = array($v);
+    $v2 = $form_state['values']['path_formats']["format_${gidstr}_fallback"];
+    if ($v == 'default' && $v2 != 'undef') {
+      $queue[] = $v2;
+    }
+
+    if ($gid == 'default') {
+      $formats['default'] = $queue;
+    } else {
+      foreach ($model['text_classes'][$model['groups'][$gid]['text_class']]['text_paths'] as $pid)
+        $formats[$pid] = $queue;
+    }
+  }
+  variable_set('wisski_textmod_input_formats', $formats);
 
 }
 

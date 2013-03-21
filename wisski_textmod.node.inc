@@ -215,6 +215,10 @@ function wisski_textmod_create_instance_by_text(&$form_state, $gid, $pid = NULL)
     '#type' => 'hidden',
     '#value' => $gid,
   );
+  $form['inst'] = array(
+    '#type' => 'hidden',
+    '#default_value' => '',
+  );
   if (!$is_own) {
     $form['pid'] = array(
       '#type' => 'select',
@@ -252,9 +256,9 @@ function wisski_textmod_create_instance_by_text_submit($form, &$form_state) {
 
   if ($is_own) {  // create a text instance
     
-      $text_inst = wisski_textmod_set_own_text($text, '', $pid);
-      if ($text_inst === FALSE) { 
-        drupal_set_message(t('Could not create text instance'));
+      list($ok, $text_inst) = wisski_textmod_set_own_text($text, '', $pid);
+      if (!$ok) { 
+        drupal_set_message($text_inst);
       } else {
         // triples are updated via _sync
         // but we need to store the format aswell
@@ -264,28 +268,48 @@ function wisski_textmod_create_instance_by_text_submit($form, &$form_state) {
         // no extra revision
         node_save($node);
    
-        $form_state['redirect'] = $text_inst; #'node/' . $node->nid;
+        $form_state['redirect'] = 'node/' . $node->nid;
       }
 
   } else {  // create text instance and attach it to other instance
     
     $samepart = _wisski_pathbuilder_calculate_group_samepart($gid);
+    
+    if (!empty($inst)) {
+      // if $inst is set we need to add the rdf:type manually in case
+      // it was set by the editor and doesn't exist in the triple store
+      $tr = array(
+        's' => $inst,
+        's_type' => 'uri',
+        'p' => 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type',
+        'o' => $samepart['x' . floor(count($samepart) / 2)],
+        'o_type' => 'uri',
+      );
+      wisski_store_getObj()->wisski_ARCAdapter_getStore()->insert(array($tr), wisski_store_getObj()->wisski_ARCAdapter_graphName());
+    }
+    
     list($ok, $inst, $text_inst) = wisski_textmod_set_foreign_text($text, $inst, '', $pid, floor(count($samepart) / 2));
 
     if (!$ok) {
-      foreach ($inst as $err) drupal_set_message($err, 'error');
+      foreach ((array) $inst as $err) drupal_set_message($err, 'error');
     } elseif ($text_inst === FALSE) { 
       drupal_set_message(t('Could not create text instance'));
     } else {
       // triples are updated via hook_nodeapi
       // but we need to store the format aswell
-      $nid = wisski_store_get_nid_for_instance($text_inst);
-      $node = node_load($nid, NULL, TRUE);  // get directly from db!
-      $node->format = $format;
+      $tnid = wisski_store_get_nid_for_instance($text_inst);
+      $tnode = node_load($tnid, NULL, TRUE);  // get directly from db!
+      $tnode->format = $format;
       // no extra revision
-      node_save($node);
-    
-      $form_state['redirect'] = $inst;
+      node_save($tnode);
+
+      $inode = node_load(wisski_store_get_nid_for_instance($inst, TRUE), NULL, TRUE);
+      
+      if (!empty($inode)) {
+        $form_state['redirect'] = 'node/' . $inode->nid;
+      } else {
+        $form_state['redirect'] = 'node/' . $tnode->nid;
+      }
     }
 
   }

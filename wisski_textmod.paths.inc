@@ -297,7 +297,6 @@ function _wisski_textmod_link_to_foreign_text($inst, $text_inst, $pid = NULL, $i
   $samepart['x' . $inst_x] = $inst;
   $triples = _wisski_pathbuilder_generate_triples_of_path(NULL, 'a', $pid, $inst, $samepart, $text_inst, $pid_x); // 'a' is a dummy value so that it works correctly
 
-dpm($triples, 'tr');
   $store = wisski_store_getObj()->wisski_ARCAdapter_getStore();
   $rows = $store->insert($triples, wisski_store_getObj()->wisski_ARCAdapter_graphName());
   foreach($triples as $triple)

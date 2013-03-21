@@ -30,15 +30,15 @@ function wisski_textmod_menu () {
 
   $items = array();
   /* admin settings */
-  $items['admin/settings/wisski/textmod'] = array(
-      'title' => 'Text Modeling',
+  $items['admin/settings/wisski/text'] = array(
+      'title' => 'Text Handling',
       'type' => MENU_LOCAL_TASK,
       'page callback' => 'drupal_get_form',
       'page arguments' => array('wisski_textmod_admin_paths'),
       'access arguments' => array('wisski administrate page'),
       'file' => 'wisski_textmod.admin.inc',
       );
-  $items['admin/settings/wisski/textmod/sync'] = array(
+  $items['admin/settings/wisski/text/mod_sync'] = array(
       'title' => 'Synchronizsation',
       'type' => MENU_LOCAL_TASK,
       'page callback' => 'drupal_get_form',
@@ -46,7 +46,7 @@ function wisski_textmod_menu () {
       'access arguments' => array('wisski administrate page'),
       'file' => 'wisski_textmod.admin.inc',
       );
-  $items['admin/settings/wisski/textmod/paths'] = array(
+  $items['admin/settings/wisski/text/mod_paths'] = array(
       'title' => 'Paths',
       'type' => MENU_DEFAULT_LOCAL_TASK,
       'page callback' => 'drupal_get_form',
@@ -180,6 +180,9 @@ function wisski_textmod_block($op = 'list', $delta = 0, $edit = array()) {
       
 
       return array(
+        0 => array(
+          'info' => t('WissKI All Texts'),
+        ),
         1 => array(
           'info' => t('WissKI Own Texts'),
         ),
@@ -197,10 +200,15 @@ function wisski_textmod_block($op = 'list', $delta = 0, $edit = array()) {
     case 'view':
       
       if ($delta == 0) {
-        drupal_set_message('Depricated block: WissKI All Texts, caller ', 'warn');
-        if (module_exists('devel')) dpm(debug_backtrace());
-        return FALSE;
+        // conbined block
+        $block = array('content' => '', 'subject' =>  t('Associated texts'));
+        $block_own_text = module_invoke('wisski_textmod', 'block', 'view', 1);
+        $block_foreign_text = module_invoke('wisski_textmod', 'block', 'view', 2);
+        $block['content'] = '<div class="wisski_textmod_own_texts_region">' . $block_own_text['content'] . '</div>';
+        $block['content'] .= '<div class="wisski_textmod_foreign_text_region">' . $block_foreign_text['content'] . '</div>';
+        return $block;
       }
+
       global $base_root, $base_path;
 
       if(is_numeric(arg(1)))
@@ -244,8 +252,7 @@ function wisski_textmod_block($op = 'list', $delta = 0, $edit = array()) {
         // or a defined default format for the path
         // we have to check for types as 0 is the system wide default format (see FILTER_FORMAT_DEFAULT)
         $format = wisski_textmod_get_format_by_path($text_info['pid'], $format);
-        if ($format !== NULL) $text = check_markup($text_info['text'], $format);
-        else $text = check_plain($text);
+        $text = check_markup($text_info['text'], $format);
 
         // make a field for each text
         $field = array(
@@ -408,17 +415,25 @@ function wisski_textmod_set_own_text($text, $text_inst = '', $pid = NULL) {
 /**
 * @author Martin Scholz
 */
-function wisski_textmod_get_format_by_class($text_class) {
-  return 0;
-}
-
-
-/**
-* @author Martin Scholz
-*/
 function wisski_textmod_get_format_by_path($pid, $default = NULL) {
-  if ($default !== NULL) return $default;
-  return 0;
+  $formats = variable_get('wisski_textmod_input_formats', array());
+  if (isset($formats[$pid])) {
+    $queue = $formats[$pid];
+  } elseif (isset($formats['default'])) {
+    $queue = $formats['default'];
+  } else {
+    $queue = array('default');
+  }
+ 
+  if ($queue[0] != 'default') {
+    return $queue[0];
+  } elseif ($default !== NULL && $default != FILTER_FORMAT_DEFAULT) {
+    return $default;
+  } elseif (isset($formats[$pid][1])) {
+    return $formats[$pid][1];
+  } else {
+    return FILTER_FORMAT_DEFAULT;
+  } 
 }
 
 
