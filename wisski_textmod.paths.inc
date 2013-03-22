@@ -31,7 +31,7 @@ function wisski_textmod_get_description_paths() {
     module_load_include('inc', 'wisski_pathbuilder');
     
     // consider all paths that have "description" as fieldtype
-    $res = db_query('SELECT * FROM {wisski_template} WHERE `fieldtype` = "description" AND NOT `enabled` = 0 ');
+    $res = db_query('SELECT * FROM {wisski_template} WHERE `fieldtype` = "description" AND NOT `enabled` = 0 ORDER BY `weight` ASC');
 
     while ($path = db_fetch_array($res)) {
       $pid = $path['id'];
@@ -55,8 +55,6 @@ function wisski_textmod_get_description_paths() {
       }
 
     }
-
-    uasort($paths, function($a, $b) { return $b['weight'] - $a['weight']; });
 
   }
 

@@ -268,7 +268,8 @@ function wisski_textmod_block($op = 'list', $delta = 0, $edit = array()) {
             '#type' => 'fieldset',
             '#title' => (empty($name) ? '' : $name . ': ') . $inst_title,
             '#collapsible' => TRUE,
-            '#weight' => $path['weight'],
+            '#collapsed' => variable_get('wisski_textmod_collapse_foreign_text_pid_' . $text_info['pid'], FALSE),
+            '#weight' => $c,
             "text$c" => $field,
           );
         } else {

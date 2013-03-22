@@ -187,6 +187,21 @@ function wisski_textmod_admin_paths($form_state) {
       '#description' => t('Fallback format if first format is Node format and it happens to be undefined or the system default format'),
     );
   }
+  
+  $collapse_paths_opt = array();
+  $default_collapse_paths_opt = array();
+  foreach ($model['paths'] as $pid => $p) {
+    $collapse_paths_opt[$pid] = wisski_pathbuilder_getName($pid) . ' (' . wisski_pathbuilder_getName($p['groups'][count($p['groups']) - 1]) . ')';
+    if (variable_get('wisski_textmod_collapse_foreign_text_pid_' . $pid, FALSE)) $default_collapse_paths_opt[$pid] = $pid;
+  }
+
+  $form['collapse_foreign_text'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Collapse foreign text fields'),
+    '#default_value' => $default_collapse_paths_opt,
+    '#options' => $collapse_paths_opt,
+  );
+
 
   $form['buttons']['submit'] = array(
     '#type' => 'submit',
@@ -220,6 +235,9 @@ function wisski_textmod_admin_paths_submit($form, $form_state) {
     }
   }
   variable_set('wisski_textmod_input_formats', $formats);
+  foreach ($form_state['values']['collapse_foreign_text'] as $k => $v) {
+    variable_set('wisski_textmod_collapse_foreign_text_pid_' . $k, $v != 0);
+  }
 
 }
 
