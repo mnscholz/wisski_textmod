@@ -203,6 +203,21 @@ function wisski_textmod_admin_paths($form_state) {
   );
 
 
+  $hide_titles_opt = array();
+  $default_hide_titles_opt = array();
+  foreach ($model['paths'] as $pid => $p) {
+    $hide_titles_opt[$pid] = wisski_pathbuilder_getName($pid) . ' (' . wisski_pathbuilder_getName($p['groups'][count($p['groups']) - 1]) . ')';
+    if (variable_get('wisski_textmod_hide_title_pid_' . $pid, FALSE)) $default_hide_titles_opt[$pid] = $pid;
+  }
+
+  $form['hide_titles'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Hide instance title in foreign text fields'),
+    '#default_value' => $default_hide_titles_opt,
+    '#options' => $hide_titles_opt,
+  );
+
+
   $form['buttons']['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save configuration'),
@@ -237,6 +252,9 @@ function wisski_textmod_admin_paths_submit($form, $form_state) {
   variable_set('wisski_textmod_input_formats', $formats);
   foreach ($form_state['values']['collapse_foreign_text'] as $k => $v) {
     variable_set('wisski_textmod_collapse_foreign_text_pid_' . $k, $v != 0);
+  }
+  foreach ($form_state['values']['hide_titles'] as $k => $v) {
+    variable_set('wisski_textmod_hide_title_pid_' . $k, $v != 0);
   }
 
 }

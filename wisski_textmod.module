@@ -210,83 +210,94 @@ function wisski_textmod_block($op = 'list', $delta = 0, $edit = array()) {
       }
 
       global $base_root, $base_path;
-
-      if(is_numeric(arg(1)))
-        $node = node_load(arg(1));
-      if(!isset($node) || $node->type != 'individual')
-        return;
       
-      $uri = wisski_store_getObj()->wisski_ARCAdapter_delNamespace($node->title);
-
-      // delta == 0 gets own texts, delta == 1 gets foreign texts
-      list($ok, $texts) = wisski_textmod_get_texts($uri, $delta != 2, $delta != 1);
-      
-      if (!$ok) {
-        foreach ($texts as $error)
-          drupal_set_message($error, 'error');
-      }
-      
-      $content = array();
-      $c = 0;
-
-      foreach ($texts as $text_info) {
-      
-        // we can go to the text instance only if it's a foreign text
-        $ops = array();
-        if ($delta != 1) {
-          $ops[] = array(t('Goto'), url($text_info['text_instance']));
-        }
-        
-        $text = $text_info['text']; 
-        $inst_title = $text_info['text_instance'];
-        $text_nid = wisski_store_get_nid_for_instance($text_info['text_instance']);
-        $text_node_url = "node/$text_nid";
-        $text_node = node_load($text_nid);
-        $format = $text_node->format;
-        if ($delta != 1) {
-          $inst_title = wisski_pathbuilder_generateGroupName($text_info['text_instance'], wisski_pathbuilder_getGroupIDForIndividual($text_info['text_instance']));
-        }
-        $ops[] = array(t('Edit'), url("$text_node_url/edit_text", array('absolute' => TRUE, 'query' => 'destination=node/' . $node->nid)));
-        
-        // format text according to filter format of text instance
-        // or a defined default format for the path
-        // we have to check for types as 0 is the system wide default format (see FILTER_FORMAT_DEFAULT)
-        $format = wisski_textmod_get_format_by_path($text_info['pid'], $format);
-        $text = check_markup($text_info['text'], $format);
-
-        // make a field for each text
-        $field = array(
-          '#type' => 'markup',
-          '#prefix' => '<div class="wisski_textmod_' . ($delta ? 'foreign' : 'own') . '_text_fr"><div class="wisski_textmod_' . ($delta ? 'foreign' : 'own') . '_text">',
-          '#value' => $text,
-          '#suffix' => '</div><div class="wisski_textmod_text_ops"><p>' . implode(' ', array_map(function($v){ return l('[' . $v[0] . ']', $v[1]); }, $ops)) . '</p></div></div>',
-        );
-        // if we collect foreign texts, surround each by a collapsible fieldset
-        if ($delta != 1) {
-          $name = wisski_pathbuilder_getName($text_info['pid']);
-          $content["fieldset_$c"] = array(
-            '#type' => 'fieldset',
-            '#title' => (empty($name) ? '' : $name . ': ') . $inst_title,
-            '#collapsible' => TRUE,
-            '#collapsed' => variable_get('wisski_textmod_collapse_foreign_text_pid_' . $text_info['pid'], FALSE),
-            '#weight' => $c,
-            "text$c" => $field,
-          );
-        } else {
-          $content["text$c"] = $field;
-        }
-
-        $c++;
-
-      }
-
+      $content = wisski_textmod_render(arg(1), $delta);
       $ret = array(
         'subject' => t('Associated texts'),
-        'content' => drupal_render($content),
+        'content' => $content,
       );
+
       return $ret;
 
   }
+
+}
+
+function wisski_textmod_render($node, $delta) {
+  /*  $delta == 1 : own text
+      $delta == 2 : associated texts
+      (see wisski_textmod_block()) */
+  
+  if(is_numeric($node))
+    $node = node_load($node);
+  if(!isset($node) || $node->type != 'individual')
+    return;
+  
+  $uri = wisski_store_getObj()->wisski_ARCAdapter_delNamespace($node->title);
+
+  // delta == 0 gets all texts, delta == 1 gets own texts, delta == 2 gets foreign texts
+  list($ok, $texts) = wisski_textmod_get_texts($uri, $delta != 2, $delta != 1);
+  
+  if (!$ok) {
+    foreach ($texts as $error)
+      drupal_set_message($error, 'error');
+  }
+  
+  $content = array();
+  $c = 0;
+
+  foreach ($texts as $text_info) {
+  
+    // we can go to the text instance only if it's a foreign text
+    $ops = array();
+    if ($delta != 1) {
+      $ops[] = array(t('Goto'), url($text_info['text_instance']));
+    }
+    
+    $text = $text_info['text']; 
+    $inst_title = $text_info['text_instance'];
+    $text_nid = wisski_store_get_nid_for_instance($text_info['text_instance']);
+    $text_node_url = "node/$text_nid";
+    $text_node = node_load($text_nid);
+    $format = $text_node->format;
+    if ($delta != 1) {
+      $inst_title = wisski_pathbuilder_generateGroupName($text_info['text_instance'], wisski_pathbuilder_getGroupIDForIndividual($text_info['text_instance']));
+    }
+    $ops[] = array(t('Edit'), url("$text_node_url/edit_text", array('absolute' => TRUE, 'query' => 'destination=node/' . $node->nid)));
+    
+    // format text according to filter format of text instance
+    // or a defined default format for the path
+    // we have to check for types as 0 is the system wide default format (see FILTER_FORMAT_DEFAULT)
+    $format = wisski_textmod_get_format_by_path($text_info['pid'], $format);
+    $text = check_markup($text_info['text'], $format);
+
+    // make a field for each text
+    $field = array(
+      '#type' => 'markup',
+      '#prefix' => '<div class="wisski_textmod_' . ($delta ? 'foreign' : 'own') . '_text_fr"><div class="wisski_textmod_' . ($delta ? 'foreign' : 'own') . '_text">',
+      '#value' => $text,
+      '#suffix' => '</div><div class="wisski_textmod_text_ops"><p>' . implode(' ', array_map(function($v){ return l('[' . $v[0] . ']', $v[1]); }, $ops)) . '</p></div></div>',
+    );
+    // if we collect foreign texts, surround each by a collapsible fieldset
+    if ($delta != 1) {
+      $name = wisski_pathbuilder_getName($text_info['pid']);
+      $content["fieldset_$c"] = array(
+        '#type' => 'fieldset',
+        '#title' => (empty($name) ? '' : $name . ': ') . (variable_get('wisski_textmod_hide_title_pid_' . $text_info['pid'], FALSE) ? '' : $inst_title),
+        '#collapsible' => TRUE,
+        '#collapsed' => variable_get('wisski_textmod_collapse_foreign_text_pid_' . $text_info['pid'], FALSE),
+        '#weight' => $c,
+        "text$c" => $field,
+      );
+    } else {
+      $content["text$c"] = $field;
+    }
+
+    $c++;
+
+  }
+
+  return drupal_render($content);
 
 }
 
