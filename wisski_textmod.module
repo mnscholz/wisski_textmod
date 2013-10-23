@@ -330,7 +330,7 @@ function wisski_textmod_get_model() {
 * @author Martin Scholz
 */
 function wisski_textmod_get_texts($inst, $include_own = TRUE, $include_foreign = TRUE) {
-  
+
   include_once(dirname(__FILE__) . '/wisski_textmod.paths.inc');
   $texts = array();
   if ($include_own) {

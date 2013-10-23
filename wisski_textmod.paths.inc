@@ -190,7 +190,8 @@ function _wisski_textmod_set_own_text($text_inst, $text, $pid = NULL) {
   $pid_info = $model['paths'][$pid];
   $pid_x = $pid_info['text_class_x'];
   
-  $text_quoted = str_replace(str_split("'\n\r\\"), str_split("\\'\\n\\r\\\\", 2), $text);
+//  $text_quoted = str_replace(str_split("'\n\r\\"), str_split("\\'\\n\\r\\\\", 2), $text);
+  $text_quoted = $text;
   $samepart = ($pid_x < 1) ? array() : array_fill(0, $pid_x * 2, "");  // this is a dummy array
   $samepart["x$pid_x"] = $text_inst;
   $triples = _wisski_pathbuilder_generate_triples_of_path(NULL, $text_quoted, $pid, $text_inst, $samepart);
@@ -251,7 +252,7 @@ function _wisski_textmod_delete_own_text($text_inst, $text = NULL, $pid = NULL) 
 
   foreach ($rows as $row) {
     if ($text === NULL || $row['out'] == $text) {
-      $text_quoted = str_replace(str_split("'\n\r\\"), str_split("\\'\\n\\r\\\\", 2), $text);
+      $text_quoted = str_replace(array("\\", "'", "\n", "\r"), array("\\\\", "\\'", "\\n", "\\r"), $text);
       $i = $pid_x;
       while (isset($row["x$i"])) $i++;
       $i--;
