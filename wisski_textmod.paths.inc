@@ -190,7 +190,8 @@ function _wisski_textmod_set_own_text($text_inst, $text, $pid = NULL) {
   $pid_info = $model['paths'][$pid];
   $pid_x = $pid_info['text_class_x'];
   
-//  $text_quoted = str_replace(str_split("'\n\r\\"), str_split("\\'\\n\\r\\\\", 2), $text);
+  // using generate_triples_of_path() we don't need to escape literals
+  // $text_quoted = str_replace(array("'", "\n", "\r", "\\"), array("\\'", "\\n", "\\r", "\\\\"), $text);
   $text_quoted = $text;
   $samepart = ($pid_x < 1) ? array() : array_fill(0, $pid_x * 2, "");  // this is a dummy array
   $samepart["x$pid_x"] = $text_inst;
@@ -239,7 +240,22 @@ function _wisski_textmod_delete_own_text($text_inst, $text = NULL, $pid = NULL) 
   $pid_info = $model['paths'][$pid];
   $pid_x = $pid_info['text_class_x'];
 
-  // query each path
+  $q =  'DELETE { <' . $text_inst . '> <' . $path['datatype_property'] . '>';
+  if ($text !== NULL) {
+    $q .= ' ?out }';
+  } else {
+    $text_quoted = str_replace(array("\\", "'", "\n", "\r"), array("\\\\", "\\'", "\\n", "\\r"), $text);
+    $q .= " '$text_quoted' . }" ;
+  }
+  $store = wisski_store_getObj()->wisski_ARCAdapter_getStore();
+  $store->query($q);
+  if ($store->getErrors()) {
+    foreach ($store->getErrors() as $e) drupal_set_message($e, 'error');
+    return FALSE;
+  }
+  return TRUE;
+
+/*  // query each path
   $filters = "FILTER (?x$pid_x = <$text_inst>)";
   $q = wisski_pathbuilder_get_sparql($pid, $filters, FALSE, $pid_x);
   $store = wisski_store_getObj()->wisski_ARCAdapter_getStore();
@@ -266,7 +282,7 @@ function _wisski_textmod_delete_own_text($text_inst, $text = NULL, $pid = NULL) 
   }
 
   return TRUE;
-
+*/
 }
 
 

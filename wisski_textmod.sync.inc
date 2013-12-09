@@ -7,6 +7,7 @@
 * 
 */
 function _wisski_textmod_sync($inst, $node, $sync_policy) {
+
   if ($sync_policy == WISSKI_TEXTMOD_DEFAULT_SYNC) $sync_policy = variable_get('wisski_textmod_sync_policy', WISSKI_TEXTMOD_MANUAL_SYNC);
   //$sync_policy &= (WISSKI_TEXTMOD_NO_SYNC | WISSKI_TEXTMOD_MANUAL_SYNC | WISSKI_TEXTMOD_TRIPLE_FIRST_SYNC | WISSKI_TEXTMOD_NODE_FIRST_SYNC);
 
@@ -60,6 +61,7 @@ function _wisski_textmod_sync($inst, $node, $sync_policy) {
 
       include_once(dirname(__FILE__) . '/wisski_textmod.paths.inc');
       if (!empty($text)) {
+
         $tmp = _wisski_textmod_delete_own_text($inst, $text, $pid);
         if (!$tmp) {
           drupal_set_message(t('Could not sync: Could not delete old text from triple store.'), 'error');
