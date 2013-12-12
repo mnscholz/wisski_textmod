@@ -216,7 +216,7 @@ function _wisski_textmod_set_own_text($text_inst, $text, $pid = NULL) {
 * @author Martin Scholz
 */
 function _wisski_textmod_delete_own_text($text_inst, $text = NULL, $pid = NULL) {
-  
+
   $model = wisski_textmod_get_model();
  
   // determine the group this individual belongs to
@@ -250,7 +250,10 @@ function _wisski_textmod_delete_own_text($text_inst, $text = NULL, $pid = NULL) 
   $store = wisski_store_getObj()->wisski_ARCAdapter_getStore();
   $store->query($q);
   if ($store->getErrors()) {
-    foreach ($store->getErrors() as $e) drupal_set_message($e, 'error');
+    foreach ($store->getErrors() as $e) {
+      watchdog('textmod', $e, array(), WATCHDOG_EROR);
+      drupal_set_message($e, 'error');
+    }
     return FALSE;
   }
   return TRUE;

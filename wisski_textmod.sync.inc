@@ -120,6 +120,8 @@ function wisski_textmod_sync_instance($inst, $sync_policy = WISSKI_TEXTMOD_DEFAU
 */
 function wisski_textmod_sync_node($node, $sync_policy = WISSKI_TEXTMOD_DEFAULT_SYNC) {
   
+  if (!isset($node->title) || empty($node->title)) return array(FALSE, t('Could not determine URI of node %nid', array('%nid' => $nde->nid)));
+
   $inst = wisski_store_getObj()->wisski_ARCAdapter_delNamespace($node->title);
 
   list($sync, $itext, $ntext) = _wisski_textmod_sync($inst, $node, $sync_policy);
@@ -134,6 +136,10 @@ function wisski_textmod_sync_node($node, $sync_policy = WISSKI_TEXTMOD_DEFAULT_S
 * @author Martin Scholz
 */
 function _wisski_textmod_set_sync_state($inst, $nid, $state) {
+  static $states = array();
+  
+  // if we set already the state, we do nothing
+  if (isset($states[$nid]) && $states[$nid] == $state) return;
   
   $res = db_query('SELECT status FROM {wisski_textmod_sync} WHERE `nid` = %d', $nid);
   $res = db_fetch_array($res);

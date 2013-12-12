@@ -153,12 +153,12 @@ function wisski_textmod_nodeapi(&$node, $op) {
  
   if ($node->type != 'individual') return;
 
-  if ($op == 'insert' || $op == 'update') {
+  if (($op == 'insert' || $op == 'update') && $node->textmod_sync != WISSKI_TEXTMOD_NO_SYNC) {
     
     // ensure that the triple store also contains the new text
     include_once(dirname(__FILE__) . '/wisski_textmod.sync.inc');
     wisski_textmod_sync_node($node, WISSKI_TEXTMOD_NODE_FIRST_SYNC);
-
+      
   } elseif ($op == 'load' && variable_get('wisski_textmod_sync_trigger', WISSKI_TEXTMOD_NO_SYNC) & WISSKI_TEXTMOD_SYNC_ON_LOAD) {
     
     // ensure that the triple store also contains the new text
