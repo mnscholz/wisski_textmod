@@ -8,6 +8,8 @@
 */
 function _wisski_textmod_sync($inst, $node, $sync_policy) {
 
+  if (isset($node->textmod_sync_policy)) $sync_policy = $node->textmod_sync_policy;
+
   if ($sync_policy == WISSKI_TEXTMOD_DEFAULT_SYNC) $sync_policy = variable_get('wisski_textmod_sync_policy', WISSKI_TEXTMOD_MANUAL_SYNC);
   //$sync_policy &= (WISSKI_TEXTMOD_NO_SYNC | WISSKI_TEXTMOD_MANUAL_SYNC | WISSKI_TEXTMOD_TRIPLE_FIRST_SYNC | WISSKI_TEXTMOD_NODE_FIRST_SYNC);
 
@@ -22,6 +24,8 @@ function _wisski_textmod_sync($inst, $node, $sync_policy) {
   if (count($texts) > 1) {
     // warn if there are more than one text paths and treat like manual sync
     drupal_set_message(t('Multiple texts for instance !i not supported at the moment. Please manually resolve.', array('!i' => l(check_plain($inst), $inst))), 'error');
+    watchdog('textmod', 'Multiple texts for instance !i not supported at the moment. Please manually resolve.', array('!i' => l(check_plain($inst), $inst)), WATCHDOG_WARNING);
+
     _wisski_textmod_set_sync_state($inst, $node->nid, WISSKI_TEXTMOD_NOT_IN_SYNC);
   }
 
@@ -49,9 +53,10 @@ function _wisski_textmod_sync($inst, $node, $sync_policy) {
       $node->body = $text;
       $node->revision = 1;
       $node->log = 'Automatic sync with triple store.';
-      drupal_set_message(t('The text node content got synced with the triple store.')); 
+//      drupal_set_message(t('The text node content got synced with the triple store.')); 
       node_save($node);
       node_load($arg1, NULL, TRUE); // if we don't reload with cache reset, subsequent calls to node_load will return the unchanged node!
+//      watchdog('textmod', 'Synced node @nid. Text length: @l', array('@nid' => $node->nid, '@l' => mb_strlen($text))); 
 
       _wisski_textmod_set_sync_state($inst, $node->nid, WISSKI_TEXTMOD_IN_SYNC);
       return array(WISSKI_TEXTMOD_IN_SYNC, $text, $text);
@@ -77,7 +82,7 @@ function _wisski_textmod_sync($inst, $node, $sync_policy) {
           return array(WISSKI_TEXTMOD_NOT_IN_SYNC, $text, $node->body); 
         }
       }
-      drupal_set_message(t('The triple store got synced with the text node content.')); 
+//      drupal_set_message(t('The triple store got synced with the text node content.')); 
 
       _wisski_textmod_set_sync_state($inst, $node->nid, WISSKI_TEXTMOD_IN_SYNC);
       return array(WISSKI_TEXTMOD_IN_SYNC, $nody->body, $nody->body);

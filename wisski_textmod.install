@@ -9,7 +9,7 @@ function wisski_textmod_install() {
   drupal_install_schema('wisski_textmod');
   
   variable_set('wisski_textmod_sync_policy', 2);
-  variable_set('wisski_textmod_sync_trigger', 3072);
+  variable_set('wisski_textmod_sync_triggers', 3072);
   
   // update the module's weight so that the nodeapi hook to sync will get called first (at least before other wisski_text* modules)
   db_query("UPDATE {system} SET weight = -100 WHERE name = 'wisski_textmod'");
@@ -24,7 +24,7 @@ function wisski_textmod_uninstall() {
 
   variable_del('wisski_textmod_model');
   variable_del('wisski_textmod_sync_policy');
-  variable_del('wisski_textmod_sync_trigger');
+  variable_del('wisski_textmod_sync_triggers');
   variable_del('wisski_textmod_cron_sync_limit');
   variable_del('wisski_textmod_cron_sync_expire');
 

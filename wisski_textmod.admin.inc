@@ -280,9 +280,9 @@ function wisski_textmod_admin_sync($form_state) {
   );
   
   $triggers = array();
-  if (variable_get('wisski_textmod_sync_trigger', WISSKI_TEXTMOD_SYNC_ON_LOAD | WISSKI_TEXTMOD_SYNC_ON_CRON) & WISSKI_TEXTMOD_SYNC_ON_LOAD)
+  if (variable_get('wisski_textmod_sync_triggers', WISSKI_TEXTMOD_SYNC_ON_LOAD | WISSKI_TEXTMOD_SYNC_ON_CRON) & WISSKI_TEXTMOD_SYNC_ON_LOAD)
     $triggers[] = 't' . WISSKI_TEXTMOD_SYNC_ON_LOAD;
-  if (variable_get('wisski_textmod_sync_trigger', WISSKI_TEXTMOD_SYNC_ON_LOAD | WISSKI_TEXTMOD_SYNC_ON_CRON) & WISSKI_TEXTMOD_SYNC_ON_CRON)
+  if (variable_get('wisski_textmod_sync_triggers', WISSKI_TEXTMOD_SYNC_ON_LOAD | WISSKI_TEXTMOD_SYNC_ON_CRON) & WISSKI_TEXTMOD_SYNC_ON_CRON)
     $triggers[] = 't' . WISSKI_TEXTMOD_SYNC_ON_CRON;
   
   $form['sync_triggers'] = array(

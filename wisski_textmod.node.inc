@@ -64,8 +64,10 @@ function wisski_textmod_edit_own_text_submit($form, &$form_state) {
   $node = node_load($nid, NULL, TRUE);
   $node->body = $text;
   $node->format = $format;
-// TODO  $node->revision = 1;
-// TODO  $node->log = '';
+  $node->revision = 1;
+  $node->log = '';
+
+  $node->textmod_sync_policy = WISSKI_TEXTMOD_NODE_FIRST_SYNC;
   
   node_save($node);
   // triples are updated via hook_nodeapi

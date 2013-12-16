@@ -139,7 +139,7 @@ function wisski_textmod_init() {
 * @author Martin Scholz
 */
 function wisski_textmod_cron() {
-  if (variable_get('wisski_textmod_sync_trigger', WISSKI_TEXTMOD_SYNC_ON_CRON) & WISSKI_TEXTMOD_SYNC_ON_CRON) {
+  if (variable_get('wisski_textmod_sync_triggers', WISSKI_TEXTMOD_SYNC_ON_CRON) & WISSKI_TEXTMOD_SYNC_ON_CRON) {
     include_once(dirname(__FILE__) . '/wisski_textmod.sync.inc');
     wisski_textmod_cron_sync();
   }
@@ -153,22 +153,25 @@ function wisski_textmod_nodeapi(&$node, $op) {
  
   if ($node->type != 'individual') return;
 
-  if (($op == 'insert' || $op == 'update') && $node->textmod_sync != WISSKI_TEXTMOD_NO_SYNC) {
+  if (($op == 'insert' || $op == 'update') && isset($node->textmod_sync_policy)) {
     
-    // ensure that the triple store also contains the new text
+    // we do not force a node first sync here since there
+    // may be cases where the body may be set wrongly...
+    // instead we can force node first by setting the
+    // textmod_sync_policy member on the node
     include_once(dirname(__FILE__) . '/wisski_textmod.sync.inc');
-    wisski_textmod_sync_node($node, WISSKI_TEXTMOD_NODE_FIRST_SYNC);
+    wisski_textmod_sync_node($node);
       
-  } elseif ($op == 'load' && variable_get('wisski_textmod_sync_trigger', WISSKI_TEXTMOD_NO_SYNC) & WISSKI_TEXTMOD_SYNC_ON_LOAD) {
+  } elseif ($op == 'load' && variable_get('wisski_textmod_sync_triggers', WISSKI_TEXTMOD_NO_SYNC) & WISSKI_TEXTMOD_SYNC_ON_LOAD) {
     
     // ensure that the triple store also contains the new text
     include_once(dirname(__FILE__) . '/wisski_textmod.sync.inc');
     wisski_textmod_sync_node($node);
 
-  }
+  } else if ($op == 'update index') {
 
-  if ($op == 'update index') {
-    return wisski_textmod_render($node, 2);
+    return  wisski_textmod_render($node, 1) . ' ' . wisski_textmod_render($node, 2);
+
   }
 
 }
