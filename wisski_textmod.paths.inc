@@ -69,6 +69,8 @@ function wisski_textmod_get_description_paths() {
 */
 function wisski_textmod_get_own_texts($inst, $pid = NULL) {
   $model = wisski_textmod_get_model();
+  
+  module_load_include('inc', 'wisski_pathbuilder');
 
   // determine the group this individual belongs to
   // and get all paths representing text
