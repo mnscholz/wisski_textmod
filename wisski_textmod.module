@@ -510,15 +510,25 @@ function wisski_textmod_access_edit_own_text($node) {
   if (!user_access('wisski access templateEdit')) return FALSE;
   
   if ($node->type != 'individual') return FALSE;
-  
-  module_load_include('inc', 'wisski_pathbuilder');
-
-  $gid = wisski_pathbuilder_getGroupIDForIndividual(wisski_store_getObj()->wisski_ARCAdapter_delNamespace($node->title));
-  if ($gid == -1) return FALSE;
 
   $model = wisski_textmod_get_model();
+  
+  module_load_include('inc', 'wisski_pathbuilder');
+  $uri = wisski_store_getObj()->wisski_ARCAdapter_delNamespace($node->title);
+  $gid = wisski_pathbuilder_getGroupIDForIndividual($uri);
+  
+  if ($gid == -1) {
+    
+    // go through the classes
+    $store = wisski_store_getObj()->wisski_ARCAdapter_getStore();
+    $rows = $store->query("SELECT ?c WHERE { <$uri> a ?c }", 'rows');
+    foreach ($rows as $row) {
+      if (isset($model['text_classes'][$row['c']])) return TRUE;
+    }
 
-  if (isset($model['groups'][$gid]) && $model['groups'][$gid]['text_class'] != NULL) return TRUE;
+  } else if (isset($model['groups'][$gid]) && $model['groups'][$gid]['text_class'] != NULL) {
+    return TRUE;
+  }
 
   return FALSE;
 
