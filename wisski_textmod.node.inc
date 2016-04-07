@@ -162,6 +162,7 @@ function wisski_textmod_add_foreign_text_submit($form, &$form_state) {
     $nid = wisski_store_get_nid_for_instance($text_inst);
     $node = node_load($nid, NULL, TRUE);  // get directly from db!
     $node->format = $format;
+    $node->body = $text;
     // no extra revision
     node_save($node);
   }
@@ -267,6 +268,7 @@ function wisski_textmod_create_instance_by_text_submit($form, &$form_state) {
         $nid = wisski_store_get_nid_for_instance($text_inst);
         $node = node_load($nid, NULL, TRUE);  // get directly from db!
         $node->format = $format;
+        $node->body = $text;
         // no extra revision
         node_save($node);
    
@@ -302,6 +304,7 @@ function wisski_textmod_create_instance_by_text_submit($form, &$form_state) {
       $tnid = wisski_store_get_nid_for_instance($text_inst);
       $tnode = node_load($tnid, NULL, TRUE);  // get directly from db!
       $tnode->format = $format;
+      $tnode->body = $text;
       // no extra revision
       node_save($tnode);
 
