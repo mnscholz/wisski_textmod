@@ -150,7 +150,7 @@ function _wisski_textmod_set_sync_state($inst, $nid, $state) {
   $res = db_fetch_array($res);
   if (!$res) {
     // insert
-    db_query("INSERT INTO {wisski_textmod_sync} (`nid`, `instance`, `status`, `timestamp`) VALUES (%d, '%s', %d, %d)", $nid, $inst, $state, time());
+    @db_query("INSERT INTO {wisski_textmod_sync} (`nid`, `instance`, `status`, `timestamp`) VALUES (%d, '%s', %d, %d)", $nid, $inst, $state, time());
   } else {
     // update; we even update if state is already set to set anew the timestamp
     db_query("UPDATE {wisski_textmod_sync} SET `status` = %d, `timestamp` = %d WHERE `nid` = %d", $state, time(), $nid);
@@ -186,7 +186,7 @@ function wisski_textmod_cron_sync() {
   // populate the agenda
   // we always load twice as many nodes as we process,
   // so that the agenda will eventually be filled with all nodes
-  db_query("INSERT INTO {wisski_textmod_sync} (`nid`, `instance`, `status`, `timestamp`) SELECT `n`.`nid` , '', %d, %d FROM {node} AS n WHERE `n`.`type` = 'individual' AND `n`.`nid` NOT IN (SELECT `s`.`nid` FROM {wisski_textmod_sync} AS s WHERE 1)", WISSKI_TEXTMOD_NEEDS_SYNC_CHECK, time());
+  @db_query("INSERT INTO {wisski_textmod_sync} (`nid`, `instance`, `status`, `timestamp`) SELECT `n`.`nid` , '', %d, %d FROM {node} AS n WHERE `n`.`type` = 'individual' AND `n`.`nid` NOT IN (SELECT `s`.`nid` FROM {wisski_textmod_sync} AS s WHERE 1)", WISSKI_TEXTMOD_NEEDS_SYNC_CHECK, time());
 
   // query $limit number of nodes and check them for sync
   // note that we check all instance nodes, regardless of whether they are text instances
